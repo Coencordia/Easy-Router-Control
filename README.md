@@ -92,3 +92,17 @@ Opbouw:
 - `easy_router_control/asus.py`: praat met de router (`login.cgi`, `appGet.cgi`, `applyapp.cgi`)
 - `easy_router_control/server.py`: lokale webserver + JSON-API voor de pagina
 - `easy_router_control/static/index.html`: de bedieningspagina
+
+## iPhone en iPad (zonder computer)
+
+`ios/EasyRouterControl.js` is een script voor de gratis app
+[Scriptable](https://apps.apple.com/app/scriptable/id1405459188). Het praat rechtstreeks met de
+router en heeft dezelfde functies als de webapp.
+
+1. Installeer Scriptable.
+2. Kopieer de inhoud van `ios/EasyRouterControl.js`.
+3. Tik in Scriptable op **+**, plak het script en noem het *Router*.
+4. Start het script, geef toegang tot het lokale netwerk en log in.
+
+Tests van de routerlogica (tegen de nep-router): start `python3 -m tests.mock_router` en voer
+daarna `node tests/test_ios_script.js 127.0.0.1:8081` uit.
