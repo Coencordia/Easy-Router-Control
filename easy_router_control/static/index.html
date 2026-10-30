@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Easy Router Control</title>
+<style>
+  :root {
+    --bg: #f4f5f7; --card: #ffffff; --text: #1d2330; --muted: #667085;
+    --border: #e2e5ea; --accent: #2563eb; --accent-text: #ffffff;
+    --danger: #dc2626; --ok: #16a34a; --warn-bg: #fff7e6; --warn-text: #8a5a00;
+    --chip: #eef2ff; --chip-text: #3730a3;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #11141a; --card: #1a1f28; --text: #e7eaf0; --muted: #98a2b3;
+      --border: #2b3240; --accent: #3b82f6; --accent-text: #ffffff;
+      --danger: #f87171; --ok: #4ade80; --warn-bg: #332712; --warn-text: #f5c26b;
+      --chip: #252c45; --chip-text: #c7d2fe;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  main { max-width: 560px; margin: 0 auto; padding: 32px 16px 64px; }
+  h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  h2 { font-size: 1.05rem; margin: 0 0 12px; }
+  .sub { color: var(--muted); margin: 0 0 24px; }
+  .card {
+    background: var(--card); border: 1px solid var(--border); border-radius: 14px;
+    padding: 20px; margin-bottom: 16px;
+  }
+  label { display: block; font-weight: 600; font-size: .9rem; margin: 12px 0 4px; }
+  input[type=text], input[type=password] {
+    width: 100%; padding: 10px 12px; font: inherit; color: var(--text);
+    background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .check { display: flex; gap: 8px; align-items: center; font-weight: 400; margin-top: 12px; }
+  button {
+    font: inherit; font-weight: 600; border: 0; border-radius: 10px; cursor: pointer;
+    padding: 10px 16px; background: var(--accent); color: var(--accent-text);
+  }
+  button:disabled { opacity: .6; cursor: default; }
+  button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--border); }
+  button.icon { background: transparent; color: var(--danger); padding: 6px 10px; }
+  .full { width: 100%; margin-top: 20px; }
+  .row { display: flex; gap: 8px; }
+  .row input { flex: 1; }
+  .top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .switch-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+  .switch-row p { margin: 0; color: var(--muted); font-size: .9rem; }
+  .switch { position: relative; width: 52px; height: 30px; flex: none; }
+  .switch input { opacity: 0; width: 0; height: 0; }
+  .slider {
+    position: absolute; inset: 0; background: var(--border); border-radius: 30px;
+    transition: background .2s; cursor: pointer;
+  }
+  .slider::before {
+    content: ""; position: absolute; width: 24px; height: 24px; left: 3px; top: 3px;
+    background: #fff; border-radius: 50%; transition: transform .2s;
+  }
+  .switch input:checked + .slider { background: var(--ok); }
+  .switch input:checked + .slider::before { transform: translateX(22px); }
+  .switch input:focus-visible + .slider { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .switch.small { width: 40px; height: 24px; }
+  .switch.small .slider::before { width: 18px; height: 18px; }
+  .switch.small input:checked + .slider::before { transform: translateX(16px); }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+  .chip {
+    background: var(--chip); color: var(--chip-text); padding: 6px 12px;
+    border-radius: 999px; font-size: .85rem;
+  }
+  ul { list-style: none; margin: 0; padding: 0; }
+  li {
+    display: flex; align-items: center; gap: 12px; padding: 10px 0;
+    border-top: 1px solid var(--border);
+  }
+  li:first-child { border-top: 0; }
+  li .url { flex: 1; overflow-wrap: anywhere; }
+  li.off .url { color: var(--muted); text-decoration: line-through; }
+  .empty { color: var(--muted); text-align: center; padding: 16px 0; }
+  .msg { border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: .92rem; }
+  .msg.error { background: color-mix(in srgb, var(--danger) 14%, transparent); color: var(--danger); }
+  .msg.warn { background: var(--warn-bg); color: var(--warn-text); }
+  .hidden { display: none !important; }
+  .count { color: var(--muted); font-weight: 400; }
+  .busy {
+    position: fixed; inset: 0; display: flex; align-items: center; justify-content: center;
+    background: color-mix(in srgb, var(--bg) 70%, transparent); backdrop-filter: blur(2px);
+  }
+  .busy div {
+    background: var(--card); border: 1px solid var(--border); border-radius: 12px;
+    padding: 16px 20px; font-weight: 600;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Easy Router Control</h1>
+  <p class="sub" id="subtitle">Blokkeer websites op je ASUS-router.</p>
+
+  <!-- Inloggen -->
+  <section id="login-view" class="card hidden">
+    <h2>Inloggen op je router</h2>
+    <form id="login-form">
+      <label for="host">Routeradres</label>
+      <input type="text" id="host" value="192.168.50.1" autocomplete="off" required>
+      <label for="username">Gebruikersnaam</label>
+      <input type="text" id="username" value="admin" autocomplete="username" required>
+      <label for="password">Wachtwoord</label>
+      <input type="password" id="password" autocomplete="current-password" required>
+      <label class="check"><input type="checkbox" id="https"> Router gebruikt HTTPS</label>
+      <div id="login-error" class="msg error hidden"></div>
+      <button type="submit" class="full" id="login-btn">Inloggen</button>
+    </form>
+  </section>
+
+  <!-- Bediening -->
+  <div id="app-view" class="hidden">
+    <section class="card">
+      <div class="switch-row">
+        <div>
+          <h2 style="margin:0">Websitefilter</h2>
+          <p id="filter-state">…</p>
+        </div>
+        <label class="switch" title="Filter aan/uit">
+          <input type="checkbox" id="filter-toggle" aria-label="Websitefilter aan of uit">
+          <span class="slider"></span>
+        </label>
+      </div>
+      <div id="whitelist-warn" class="msg warn hidden">
+        Let op: je router staat in <b>whitelist-modus</b>. Dan zijn alléén de websites
+        in deze lijst toegestaan. Je kunt dit wijzigen in de routerinstellingen
+        (Ouderlijk toezicht → URL-filter).
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Website blokkeren</h2>
+      <form id="add-form" class="row">
+        <input type="text" id="new-url" placeholder="bijv. tiktok.com" autocomplete="off"
+               autocapitalize="off" spellcheck="false" aria-label="Website om te blokkeren">
+        <button type="submit">Blokkeer</button>
+      </form>
+      <div class="chips" id="presets"></div>
+      <div id="app-error" class="msg error hidden"></div>
+    </section>
+
+    <section class="card">
+      <h2>Geblokkeerde websites <span class="count" id="count"></span></h2>
+      <ul id="rules"></ul>
+    </section>
+
+    <div class="top">
+      <span class="sub" id="router-info" style="margin:0"></span>
+      <button class="ghost" id="logout-btn">Uitloggen</button>
+    </div>
+  </div>
+</main>
+
+<div id="busy" class="busy hidden"><div id="busy-text">Bezig…</div></div>
+
+<script>
+const CSRF = "__CSRF_TOKEN__";
+const PRESETS = {
+  "TikTok": ["tiktok.com", "tiktokv.com", "tiktokcdn.com"],
+  "Instagram": ["instagram.com", "cdninstagram.com"],
+  "YouTube": ["youtube.com", "youtu.be"],
+  "Facebook": ["facebook.com", "fb.com"],
+  "Snapchat": ["snapchat.com"],
+  "X / Twitter": ["x.com", "twitter.com"],
+  "Roblox": ["roblox.com", "rbxcdn.com"],
+  "Netflix": ["netflix.com"],
+};
+
+const $ = (id) => document.getElementById(id);
+let state = { enabled: false, rules: [] };
+
+async function api(path, body) {
+  const opts = { headers: { "X-App-Token": CSRF } };
+  if (body !== undefined) {
+    opts.method = "POST";
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+  let res;
+  try {
+    res = await fetch(path, opts);
+  } catch {
+    throw new Error("De app reageert niet. Draait het programma nog?");
+  }
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && path !== "/api/login") {
+    showLogin(data.error || "Je bent uitgelogd. Log opnieuw in.");
+    throw new Error("");
+  }
+  if (!res.ok) throw new Error(data.error || `Fout ${res.status}`);
+  return data;
+}
+
+function showMsg(el, text) {
+  el.textContent = text;
+  el.classList.toggle("hidden", !text);
+}
+
+function busy(text) {
+  $("busy-text").textContent = text || "";
+  $("busy").classList.toggle("hidden", !text);
+}
+
+function showLogin(error) {
+  $("app-view").classList.add("hidden");
+  $("login-view").classList.remove("hidden");
+  $("subtitle").textContent = "Blokkeer websites op je ASUS-router.";
+  showMsg($("login-error"), error || "");
+  try {
+    const saved = JSON.parse(localStorage.getItem("erc-login") || "{}");
+    if (saved.host) $("host").value = saved.host;
+    if (saved.username) $("username").value = saved.username;
+    $("https").checked = !!saved.https;
+  } catch {}
+  $("password").value = "";
+  $("password").focus();
+}
+
+function showApp() {
+  $("login-view").classList.add("hidden");
+  $("app-view").classList.remove("hidden");
+}
+
+function render(data) {
+  state = { enabled: data.enabled, rules: data.rules };
+  if (data.router) {
+    $("router-info").textContent = `${data.router.model} · firmware ${data.router.firmware}`;
+    $("subtitle").textContent = `Verbonden met ${data.router.model}.`;
+  }
+  $("filter-toggle").checked = data.enabled;
+  const active = data.rules.filter(r => r.enabled).length;
+  $("filter-state").textContent = data.enabled
+    ? (active ? `Aan — ${active} website${active === 1 ? "" : "s"} geblokkeerd` : "Aan — nog geen websites in de lijst")
+    : "Uit — er wordt niets geblokkeerd";
+  $("whitelist-warn").classList.toggle("hidden", !data.whitelist);
+  $("count").textContent = data.rules.length ? `(${data.rules.length})` : "";
+
+  const list = $("rules");
+  list.replaceChildren();
+  if (!data.rules.length) {
+    const li = document.createElement("li");
+    li.className = "empty";
+    li.textContent = "Nog geen geblokkeerde websites.";
+    list.append(li);
+  }
+  data.rules.forEach((rule, i) => {
+    const li = document.createElement("li");
+    li.classList.toggle("off", !rule.enabled);
+
+    const sw = document.createElement("label");
+    sw.className = "switch small";
+    sw.title = rule.enabled ? "Regel actief" : "Regel gepauzeerd";
+    const cb = document.createElement("input");
+    cb.type = "checkbox";
+    cb.checked = rule.enabled;
+    cb.disabled = data.legacy;
+    cb.setAttribute("aria-label", `Blokkeren van ${rule.url} aan of uit`);
+    cb.addEventListener("change", () => {
+      const rules = state.rules.map((r, j) => j === i ? { ...r, enabled: cb.checked } : r);
+      save(state.enabled, rules, cb.checked ? `${rule.url} weer blokkeren…` : `${rule.url} pauzeren…`);
+    });
+    const slider = document.createElement("span");
+    slider.className = "slider";
+    sw.append(cb, slider);
+
+    const url = document.createElement("span");
+    url.className = "url";
+    url.textContent = rule.url;
+
+    const del = document.createElement("button");
+    del.className = "icon";
+    del.textContent = "Verwijder";
+    del.setAttribute("aria-label", `${rule.url} verwijderen`);
+    del.addEventListener("click", () => {
+      save(state.enabled, state.rules.filter((_, j) => j !== i), `${rule.url} verwijderen…`);
+    });
+
+    li.append(sw, url, del);
+    list.append(li);
+  });
+}
+
+async function save(enabled, rules, label) {
+  showMsg($("app-error"), "");
+  busy(label || "Opslaan op router…");
+  try {
+    render(await api("/api/filter", { enabled, rules }));
+    return true;
+  } catch (e) {
+    if (e.message) showMsg($("app-error"), e.message);
+    render({ ...state, enabled: state.enabled, rules: state.rules });
+    return false;
+  } finally {
+    busy("");
+  }
+}
+
+function addSites(urls) {
+  const known = new Set(state.rules.map(r => r.url));
+  const extra = urls.filter(u => !known.has(u)).map(url => ({ url, enabled: true }));
+  if (!extra.length) {
+    showMsg($("app-error"), "Deze website staat al in de lijst.");
+    return Promise.resolve(false);
+  }
+  // Iets toevoegen terwijl het filter uit staat heeft geen effect, dus zet het aan.
+  return save(true, [...state.rules, ...extra], "Blokkeren…");
+}
+
+async function load() {
+  busy("Instellingen ophalen…");
+  try {
+    render(await api("/api/filter"));
+    showApp();
+  } catch (e) {
+    if (e.message) showLogin(e.message);
+  } finally {
+    busy("");
+  }
+}
+
+$("login-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const body = {
+    host: $("host").value.trim(),
+    username: $("username").value.trim(),
+    password: $("password").value,
+    https: $("https").checked,
+  };
+  showMsg($("login-error"), "");
+  $("login-btn").disabled = true;
+  busy("Inloggen…");
+  try {
+    await api("/api/login", body);
+    try {
+      localStorage.setItem("erc-login", JSON.stringify({ host: body.host, username: body.username, https: body.https }));
+    } catch {}
+    $("password").value = "";
+    busy("");
+    await load();
+  } catch (e) {
+    showMsg($("login-error"), e.message);
+  } finally {
+    $("login-btn").disabled = false;
+    busy("");
+  }
+});
+
+$("add-form").addEventListener("submit", async (ev) => {
+  ev.preventDefault();
+  const value = $("new-url").value.trim();
+  if (!value) return;
+  if (await addSites([value.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").split(/[/?#]/)[0]])) {
+    $("new-url").value = "";
+  }
+});
+
+$("filter-toggle").addEventListener("change", (ev) => {
+  save(ev.target.checked, state.rules, ev.target.checked ? "Filter aanzetten…" : "Filter uitzetten…");
+});
+
+$("logout-btn").addEventListener("click", async () => {
+  try { await api("/api/logout", {}); } catch {}
+  showLogin("");
+});
+
+for (const [name, urls] of Object.entries(PRESETS)) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "chip";
+  b.textContent = "+ " + name;
+  b.title = urls.join(", ");
+  b.addEventListener("click", () => addSites(urls));
+  $("presets").append(b);
+}
+
+(async () => {
+  try {
+    const s = await api("/api/session");
+    if (s.loggedIn) return load();
+  } catch {}
+  showLogin("");
+})();
+</script>
+</body>
+</html>
